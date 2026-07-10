@@ -174,11 +174,11 @@ jobs:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
       CCACHE_HARDLINK: "true"
-      CCACHE_MAXSIZE: 8G
+      CCACHE_MAXSIZE: 4G
       
     steps:
       - name: "🚀 Maximize Build Space | 最大化构建空间"
-        if: ${{ github.event.inputs.KERNEL_VERSION == '5.10' || github.event.inputs.KERNEL_VERSION == '5.15' }}
+        if: ${{ github.event.inputs.KERNEL_VERSION == '5.10' || github.event.inputs.KERNEL_VERSION == '6.6' }}
         uses: easimon/maximize-build-space@master
         with:
           root-reserve-mb: 8192
