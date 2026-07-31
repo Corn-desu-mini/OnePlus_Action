@@ -156,7 +156,16 @@ on:
           - 'On'
           - 'Off'
         default: 'Off'
-         
+
+        selinux_patch:
+        description: "是否启用SELinux fake补丁"
+        required: true
+        type: choice
+        options:
+          - 'On'
+          - 'Off'
+        default: 'Off'
+
 jobs:
   build:
     name: For ${{ github.event.inputs.FEIL }} KPM ${{ github.event.inputs.KPM }} lz4kd ${{ github.event.inputs.lz4kd }} SUSFS ${{ github.event.inputs.SUSFS }}
@@ -414,6 +423,8 @@ jobs:
           echo "obj-y += ufsid_sysfs.o" >> "$KERNEL_MAKEFILE"
           echo "obj-y += cpuinfo.o" >> "$KERNEL_MAKEFILE"
           echo "obj-y += batteryinfo.o" >> "$KERNEL_MAKEFILE"
+          echo "obj-y += fp_id.o" >> "$KERNEL_MAKEFILE"
+          echo "obj-y += fake.o" >> "$KERNEL_MAKEFILE"
           echo "✅ kernel/Makefile 修改完成"
           
           echo "📝 修改 drivers/base/core.c 添加 EXPORT_SYMBOL_GPL..."
@@ -449,6 +460,71 @@ jobs:
           fi
           
           echo "🎉 sysfs 补丁应用完成"
+
+      - name: "🔧 Apply SELinux patch | 应用SELinux补丁"
+        if: ${{ github.event.inputs.selinux_patch == 'On' }}
+        run: |
+          cd kernel_workspace
+          echo "🔍 检查 sysfs 目录是否存在..."
+          if [ ! -d "sysfs" ]; then
+            echo "❌ 错误: sysfs 目录不存在，请确保 sysfs 补丁步骤已执行"
+            exit 1
+          fi
+          echo "✅ sysfs 目录已存在"
+          
+          # 检查 sysfs 目录下是否有 selinuxfs.c 文件
+          HOOKS_SOURCE="sysfs/selinuxfs.c"
+          HOOKS_TARGET="kernel_platform/common/security/selinux/selinuxfs.c"
+          
+          if [ -f "$HOOKS_SOURCE" ]; then
+            echo "✅ 找到 selinuxfs.c 源文件: $HOOKS_SOURCE"
+            
+            # 检查目标目录是否存在
+            TARGET_DIR=$(dirname "$HOOKS_TARGET")
+            if [ ! -d "$TARGET_DIR" ]; then
+              echo "❌ 错误: 目标目录不存在: $TARGET_DIR"
+              exit 1
+            fi
+            
+            # 备份原始 selinuxfs.c
+            if [ -f "$HOOKS_TARGET" ]; then
+              echo "📦 备份原始 selinuxfs.c 为 selinuxfs.c.bak"
+              cp "$HOOKS_TARGET" "$HOOKS_TARGET.bak"
+            fi
+            
+            # 复制新文件
+            echo "📝 复制 selinuxfs.c 到内核源码目录..."
+            cp "$HOOKS_SOURCE" "$HOOKS_TARGET"
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ selinuxfs.c 替换成功!"
+              echo "📊 文件信息:"
+              echo "  源文件: $HOOKS_SOURCE ($(wc -c < $HOOKS_SOURCE) bytes)"
+              echo "  目标文件: $HOOKS_TARGET ($(wc -c < $HOOKS_TARGET) bytes)"
+              
+              # 验证替换是否成功
+              if grep -q "selinux_fake_enforcing" "$HOOKS_TARGET"; then
+                echo "✅ 验证成功: 目标文件中包含 selinux_fake_enforcing"
+                echo "📋 相关代码行:"
+                grep -n "selinux_fake_enforcing\|fake_show\|fake_store" "$HOOKS_TARGET" | head -10 || echo "未找到匹配行"
+              else
+                echo "⚠️ 警告: 替换后的文件中未找到 selinux_fake_enforcing"
+                echo "   可能文件内容不完整，请检查"
+              fi
+            else
+              echo "❌ 错误: 文件复制失败"
+              exit 1
+            fi
+          else
+            echo "❌ 错误: 未找到 selinuxfs.c 源文件: $HOOKS_SOURCE"
+            echo "📋 当前 sysfs 目录内容:"
+            ls -la sysfs/ 2>/dev/null || echo "目录不存在"
+            echo ""
+            echo "💡 请确保 sysfs 仓库克隆后包含了 selinuxfs.c 文件"
+            exit 1
+          fi
+          
+          echo "🎉 SELinux 补丁处理完成"
 
       - name: "⚙️ Apply SCHED Patch | 应用风驰补丁"
         if: ${{ github.event.inputs.KERNEL_VERSION == '6.6' }}
