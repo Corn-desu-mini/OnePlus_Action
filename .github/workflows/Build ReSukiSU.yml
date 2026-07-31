@@ -157,7 +157,7 @@ on:
           - 'Off'
         default: 'Off'
 
-        selinux_patch:
+      selinux_patch:
         description: "是否启用SELinux fake补丁"
         required: true
         type: choice
