@@ -130,6 +130,15 @@ on:
           - 'Off'
         default: 'Off'
 
+      CVE_2026_43499:
+        description: "是否应用 CVE-2026-43499 rtmutex 修复补丁"
+        required: true
+        type: choice
+        options:
+          - 'On'
+          - 'Off'
+        default: 'Off'
+         
       sysfs:
         description: "是否启用sysfs补丁"
         required: true
@@ -169,6 +178,9 @@ jobs:
           remove-android: 'true'
           remove-haskell: 'true'
           remove-codeql: 'true'
+
+      - name: "📥 Checkout Builder | 检出构建脚本"
+        uses: actions/checkout@v4
 
       - name: "⚙️ Setup Cache Env | 设置缓存环境"
         run: |
@@ -250,11 +262,11 @@ jobs:
           sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' kernel_platform/external/dtc/scripts/setlocalversion
 
           if [ "${{ github.event.inputs.KERNEL_VERSION }}" != "6.6" ]; then
-            sed -i '$s|echo "\$res"|echo "-${{ github.event.inputs.ANDROID_VERSION }}-oki-AR26710"|' kernel_platform/common/scripts/setlocalversion            
-            sed -i '$s|echo "\$res"|echo "-${{ github.event.inputs.ANDROID_VERSION }}-oki-AR26710"|' kernel_platform/msm-kernel/scripts/setlocalversion
-            sed -i '$s|echo "\$res"|echo "-${{ github.event.inputs.ANDROID_VERSION }}-oki-AR26710"|' kernel_platform/external/dtc/scripts/setlocalversion
+            sed -i '$s|echo "\$res"|echo "-${{ github.event.inputs.ANDROID_VERSION }}-oki-Cyrene"|' kernel_platform/common/scripts/setlocalversion            
+            sed -i '$s|echo "\$res"|echo "-${{ github.event.inputs.ANDROID_VERSION }}-oki-Cyrene"|' kernel_platform/msm-kernel/scripts/setlocalversion
+            sed -i '$s|echo "\$res"|echo "-${{ github.event.inputs.ANDROID_VERSION }}-oki-Cyrene"|' kernel_platform/external/dtc/scripts/setlocalversion
           else
-            ESCAPED_SUFFIX=$(printf '%s\n' "-${{ github.event.inputs.ANDROID_VERSION }}-oki-AR26710" | sed 's:[\/&]:\\&:g')
+            ESCAPED_SUFFIX=$(printf '%s\n' "-${{ github.event.inputs.ANDROID_VERSION }}-oki-Cyrene" | sed 's:[\/&]:\\&:g')
             sudo sed -i "s/-4k/$ESCAPED_SUFFIX/g" kernel_platform/common/arch/arm64/configs/gki_defconfig
             sed -i 's/${scm_version}//' kernel_platform/common/scripts/setlocalversion
             sed -i 's/${scm_version}//' kernel_platform/msm-kernel/scripts/setlocalversion
@@ -302,7 +314,14 @@ jobs:
           echo "🔧 应用补丁..."
           
           cd ./common
-          
+
+          if [ "${{ github.event.inputs.CVE_2026_43499 }}" = "On" ]; then
+            echo "🛡️ 正在应用 CVE-2026-43499 rtmutex 修复补丁..."
+            bash "$GITHUB_WORKSPACE/security_patch/apply_cve_2026_43499.sh" "${{ github.event.inputs.KERNEL_VERSION }}" "$GITHUB_WORKSPACE/security_patch"
+          else
+            echo "ℹ️ 跳过 CVE-2026-43499 rtmutex 修复补丁"
+          fi
+
           if [ "${{ github.event.inputs.UNICODE_BYPASS }}" = "On" ]; then
             echo "📦 正在应用Unicode零宽绕过修复补丁..."
             patch -p1 < unicode_bypass_fix.patch
@@ -570,8 +589,8 @@ jobs:
       - name: "🔨 Build Kernel | 编译内核"
         run: |
           echo "🏗️ 开始内核编译..."
-          export KBUILD_BUILD_USER="AR26710"
-          export KBUILD_BUILD_HOST="AR26710_build"
+          export KBUILD_BUILD_USER="Cyrene"
+          export KBUILD_BUILD_HOST="Cyrene_build"
 
           if [ "${{ github.event.inputs.KERNEL_VERSION }}" == "6.1" ]; then
             export KBUILD_BUILD_TIMESTAMP="Tue Mar 10 03:53:33 UTC 2026"
